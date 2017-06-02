@@ -4,7 +4,8 @@ RUN cpanm XML::LibXML \
   LWP \
   LWP::Protocol::https \
   HTTP::Request::StreamingUpload \
-  XML::Simple 
+  XML::Simple \
+  XML::XML2JSON 
 COPY . /usr/src/ebi-submitter
 WORKDIR /usr/src/ebi-submitter/
 RUN chmod a+x scripts/*
