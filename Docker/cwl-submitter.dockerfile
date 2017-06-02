@@ -17,6 +17,7 @@ RUN apt-get install -y cpanminus \
   wget \
   zlib1g-dev
   
+RUN cpanm install JSON XML::Simple  
 # RUN cpanm JSON \
 #   LWP \
 #   LWP::Protocol::https \
@@ -55,6 +56,7 @@ ENV PATH /usr/src/autoskewer/:$PATH
 COPY . ebi-submitter
 RUN chmod a+x ebi-submitter/scripts/*
 ENV PATH /usr/src/ebi-submitter/scripts:$PATH
+
 
 CMD ["cwltool"]
 
