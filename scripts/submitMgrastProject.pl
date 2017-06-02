@@ -63,6 +63,8 @@ my $download_files  = 0 ;     # Download sequence files from project and save th
 my $upload_files    = 0 ;     # Upload sequence files from $staging_dir to ENA inbox
 my $staging_dir     = "./" ;  # Download/Upload directory
 
+my $taxid2name = {} ;
+
 my $create_xml_options = {
   study => undef ,
   experiment => undef ,
@@ -112,6 +114,7 @@ GetOptions(
      'file_id_key=s'    => \$file_id_key,
      'file_id_value=s'  => \$file_id_value,
      'submission_id=s'  => \$submission_id,
+     'taxonomy_file=s'  => \$ncbi_tax_file,
 	  );
 
 sub usage {
@@ -156,6 +159,16 @@ unless($submission_id){
 print STDERR "Setting up user agent and ftp connection\n" if ($verbose);
 my $ua = LWP::UserAgent->new;
 $ua->agent('EBI Client 0.1');
+
+if ($ncbi_tax_file and -f $ncbi_tax_file){
+  open(FILE , $ncbi_tax_file) or die "Error, can't open $ncbi_tax_file!" ;
+  while(my $line = <FILE>) {
+    chomp $line ;
+    my ($top , $name , $id) = split "\t" , $line ;
+    $taxid2name->{$id} = $name ;
+  }
+  
+}
 
 
 # Setup ftp/aspera connection and change into project dir for upload
@@ -400,6 +413,10 @@ sub get_sample_xml{
    my $sample_alias = $data->{id};
    my $sample_name  = $data->{name};
    my $sample_attribute_table = {};
+   my $checklistID = 'ERC000025' ;
+   if (get_checklist()){
+     $checklistID = get_checklist() ;
+   }
    foreach my $key ( keys %{$data->{metadata}} ) {
        $sample_attribute_table->{$key} = $data->{metadata}->{$key} ;
    }
@@ -419,7 +436,11 @@ sub get_sample_xml{
    }
    
 
-   my $sample_xml = <<"EOF";
+   my $TaxName = $taxid2name->{$ncbiTaxId};
+   my $TITLE  = "<TITLE>$sample_name Taxonomy ID:$ncbiTaxId</TITLE>" ;
+   my $DESCRIPTION = "<DESCRIPTION>$sample_name Taxonomy ID:$TaxName</DESCRIPTION>"
+   
+   my $sample_xml = <<"EOF"; 
 
     <SAMPLE alias="$sample_alias"
     center_name="$center_name">
@@ -427,7 +448,7 @@ sub get_sample_xml{
         <SAMPLE_NAME>
             <TAXON_ID>$ncbiTaxId</TAXON_ID>
         </SAMPLE_NAME>
-        <DESCRIPTION>$sample_name Taxonomy ID:$ncbiTaxId</DESCRIPTION>
+        <DESCRIPTION>$sample_name Taxonomy ID:$TaxName</DESCRIPTION>
         <SAMPLE_ATTRIBUTES>
 EOF
 
@@ -436,6 +457,8 @@ EOF
           <SAMPLE_ATTRIBUTE>
              <TAG>BROKER_OBJECT_ID</TAG>
              <VALUE>$id</VALUE>
+             <TAG>ENA-CHECKLIST</TAG>
+             <VALUE>$checklistID</VALUE>
           </SAMPLE_ATTRIBUTE>
 EOF
 }
