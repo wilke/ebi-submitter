@@ -14,18 +14,24 @@ my $file = shift @ARGV ;
 my $upload  = 1 ;
 my $debug   = 0 ;
 
-print $file , "\n";
+print STDERR $file , "\n";
+
+
 
 my $receipt = new Receipt();
 $receipt->parse($file) ;
-print join "\t" , "Success:" , $receipt->success() || "undef" , "\n";
-print join "\t" , "Submission:" , $receipt->submission , "\n";
+print STDERR join "\t" , "Success:" , $receipt->success() || "undef" , "\n";
+print STDERR join "\t" , "Submission:" , $receipt->submission , "\n";
 
 
 if ($upload) {
   
   my $json = JSON->new ;
   my $attributes = {
+    id => undef ,
+    file_name => 'receipt.xml',
+    data_type => 'submission' ,
+    file_format => "xml" ,
     project_id    => $receipt->xml->{STUDY}->{alias} ,
     submission_id => $receipt->xml->{SUBMISSION}->{alias},
     type          => 'EBI Submission Receipt' ,
@@ -41,7 +47,8 @@ if ($upload) {
   };
   #$attributes = $json->encode($receipt->xml) ;
   
-  print Dumper $attributes , "\n" ; 
+  print STDERR Dumper $attributes ; 
+  print $json->encode($attributes) ;
   
 }
 
@@ -53,7 +60,7 @@ sub get_md5{
   
   my $md5bin =  `which md5sum `;
   chomp $md5bin ;
-  print "TEST:\n" , $md5bin , "END\n";
+  print STDERR "TEST:\n" , $md5bin , "END\n";
   
   # which md5 script, linux versus mac
   
@@ -108,7 +115,7 @@ sub new{
     xml => undef ,
   } ;
   
-  print Dumper @list ;
+  print STDERR  Dumper @list ;
   return bless $r
 }
 
@@ -131,7 +138,7 @@ sub parse{
 
     my $receipt = XMLin( $file , KeyAttr => { server => 'name' }, ForceArray => [ 'SAMPLE', 'EXPERIMENT'  , 'ACTIONS' , 'RUN' ]);
     $self->{xml} = $receipt ;
-    print Dumper $receipt ;
+    print STDERR Dumper $receipt ;
 }
 
 sub xml{
