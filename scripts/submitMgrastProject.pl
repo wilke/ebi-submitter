@@ -62,8 +62,13 @@ my $receipt_file    = "./receipt.xml";
 my $download_files  = 0 ;     # Download sequence files from project and save them in $staging_dir
 my $upload_files    = 0 ;     # Upload sequence files from $staging_dir to ENA inbox
 my $staging_dir     = "./" ;  # Download/Upload directory
+my $ncbi_tax_file   = undef ; # tsv file with ncbi tax ids: parent\tname\ttaxonomyID , e.g. ecological metagenomes  soil    410658
+my $no_cache        = 0 ; # if true , delete sequence files imedialtly after md5sum compute and ftp upload
 
+# Build from $ncbi_tax_file , used to map {metadata}->{metagenome_taxonomy} or {metadata}->{env_package} to taxid and back
 my $taxid2name = {} ;
+my $name2taxid = {} ;
+
 
 my $create_xml_options = {
   study => undef ,
@@ -114,12 +119,13 @@ GetOptions(
      'file_id_key=s'    => \$file_id_key,
      'file_id_value=s'  => \$file_id_value,
      'submission_id=s'  => \$submission_id,
-     'taxonomy_file=s'  => \$ncbi_tax_file,
+     'taxonomy_file=s'  => \$ncbi_tax_file, 
+     'no-cache'         => \$no_cache ,
 	  );
 
 sub usage {
   print "\n\ncreate_xml.pl >>> create the ENA XML file for an MG-RAST project and submit it to EBI\n";
-  print "create_xml.pl -user <username> -password <password> -project_id <project id>\n";
+  print "submitMgrastProject.pl -user <username> -password <password> -project_id <project id>\n";
   print "\nOPTIONS\n";
   print "-user - EBI submitter login; if provided overrides environment variable EBI_USER\n" ;
   print "-password - password for user; if provided overrides environment variable EBI_PASSWORD\n" ; 
@@ -166,6 +172,7 @@ if ($ncbi_tax_file and -f $ncbi_tax_file){
     chomp $line ;
     my ($top , $name , $id) = split "\t" , $line ;
     $taxid2name->{$id} = $name ;
+    $name2taxid->{$name} = $id ;
   }
   
 }
@@ -215,6 +222,11 @@ my $prj       = new Submitter::Project($project_data);
 my $study_xml = $prj->xml2txt ;
 print Dumper  $study_xml if ($verbose); 
 
+# dump study_xml
+open(FILE , ">$staging_dir/study.xml") or die "Can't write to study.xml" ;
+print FILE $study_xml ;
+close(FILE);
+
 
 ###### add to experiment // sequencing technology
 my $ebi_tech = $project_data->{ebi_tech} ; 
@@ -242,6 +254,10 @@ foreach my $sample_obj (@{$project_data->{samples}}) {
 
 $sample_xml .= "</SAMPLE_SET>";
 
+# dump sample_xml
+open(FILE , ">$staging_dir/sample.xml") or die "Can't write sample.xml" ;
+print FILE $sample_xml ;
+close(FILE);
 
 ###### Create Experiment XML ######
 
@@ -254,19 +270,24 @@ my $experiments = new Submitter::Experiments( {
 # build list of metagenomes
 foreach my $library_obj (@{$project_data->{metagenomes}}) {
   my $metagenome_id = $library_obj->{metagenome_id};
-	my ($experiment_data,$err) = get_json_from_url($ua,$url,$experiment_resource,$metagenome_id,$options);
+	my ($experiment_data,$err) = get_json_from_url($ua,$url,$experiment_resource,$metagenome_id,"?verbosity=metadata");
+  print STDERR "Calling: $url , $experiment_resource , $metagenome_id , $options \n" if ($verbose);
 	if($error){
 	    print STDERR "Error retrieving library data for $metagenome_id (ERROR:$err)\n";
 	    next;
 	}
   else{
-    print STDERR "Adding " . $experiment_data->{id} . "\n";
+    print STDERR "Adding metagenome/experiment:" . $experiment_data->{id} . "\n";
   }
   $experiments->add($experiment_data)
 }
 
 my $experiment_xml = $experiments->xml2txt ;
 
+# dump experiment_xml
+open(FILE , ">$staging_dir/experiment.xml") or die "Can't write experiment.xml" ;
+print FILE $experiment_xml ;
+close(FILE);
 
 
 
@@ -399,7 +420,8 @@ sub get_sample_xml{
    
    unless($ncbiTaxId){
      
-      $ncbiTaxId = get_ncbiScientificNameTaxID( $data->{metadata}->{env_package} ) if ($guess_taxon_id);
+      $ncbiTaxId =  get_ncbiScientificNameTaxID( $data->{metadata}->{metagenome_taxonomy} ) ||
+                    get_ncbiScientificNameTaxID( $data->{metadata}->{env_package} ) if ($guess_taxon_id);
       
       unless($ncbiTaxId){
         print STDERR "No tax id for " . ($data->{metadata}->{biome}) . "\n";
@@ -438,7 +460,7 @@ sub get_sample_xml{
 
    my $TaxName = $taxid2name->{$ncbiTaxId};
    my $TITLE  = "<TITLE>$sample_name Taxonomy ID:$ncbiTaxId</TITLE>" ;
-   my $DESCRIPTION = "<DESCRIPTION>$sample_name Taxonomy ID:$TaxName</DESCRIPTION>"
+   my $DESCRIPTION = "<DESCRIPTION>$sample_name Taxonomy ID:$TaxName</DESCRIPTION>" ;
    
    my $sample_xml = <<"EOF"; 
 
@@ -617,11 +639,16 @@ sub get_ncbiScientificNameTaxID{
 		   'freshwater biome' => 449939,
 		   'human-associated habitat' => 646099 ,
        'human-oral' => 447426 ,
+       'soil' => 410658 ,
     };
 
-    print STDERR "Lookup for $key : " . $mapping->{$key} , "\n" if($verbose) ;
+    my $name =  $name2taxid->{$key} || $mapping->{$key} || undef ;
+   
 
-    return $mapping->{$key} || undef ;
+
+    print STDERR "Lookup for $key : " . ($name2taxid->{$key} || $mapping->{$key})  , "\n" if($verbose) ;
+
+    return $name ;
 }
 
 # Submit xml files
@@ -784,7 +811,19 @@ sub prep_files_for_upload{
 			
 			
 		 
-		   $ftp->put($file_zip) unless ($skip_upload);
+		   my $success = 0 ;
+       $ftp->put($file_zip) unless ($skip_upload);
+       $success = 1 if $ftp->size($file_zip) ;
+       
+       print STDERR "FTP upload of $file_zip done." if ($verbose) ;
+       if ($no_cache){
+         open(File , ">$file_zip.uploaded") or die "Can't open $file_zip.uploaded for writing!\n" ;
+         print FILE "MD5\t$md5\n";
+         close FILE ;
+         if ($success) {
+          unlink $file_zip or warn "Could not unlink $file_zip: $!";
+        }
+       }
 		   #print join "\n" , $ftp->ls ;
 		   #$ftp->cwd("/pub") or die "Cannot change working directory ", $ftp->message;
 		   #$ftp->get("that.file") or die "get failed ", $ftp->message;
@@ -939,4 +978,11 @@ sub get_md5{
   }
   
   return $md5 ;
+}
+
+
+# Get ENA Checklist ID
+sub get_checklist{
+  
+  return undef ;
 }
