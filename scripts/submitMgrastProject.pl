@@ -821,7 +821,15 @@ sub prep_files_for_upload{
          print FILE "MD5\t$md5\n";
          close FILE ;
          if ($success) {
+          print STDERR "Removing file $file_zip\n" ; 
           unlink $file_zip or warn "Could not unlink $file_zip: $!";
+          }
+          else{
+            print STDERR "Something wrong with ftp upload (success=$success). File size is " . ftp->size($file_zip) . "\n";
+          }
+        
+        else{
+          print STDERR "Leaving file $file_zip in staging dir.\n" if ($verbose) ;
         }
        }
 		   #print join "\n" , $ftp->ls ;
