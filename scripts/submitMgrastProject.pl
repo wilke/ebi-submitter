@@ -815,23 +815,27 @@ sub prep_files_for_upload{
        $ftp->put($file_zip) unless ($skip_upload);
        $success = 1 if $ftp->size($file_zip) ;
        
-       print STDERR "FTP upload of $file_zip done." if ($verbose) ;
+       print STDERR "FTP upload of $file_zip done.\n" if ($verbose) ;
+       
        if ($no_cache){
-         open(File , ">$file_zip.uploaded") or die "Can't open $file_zip.uploaded for writing!\n" ;
+         
+         open(FILE , ">$file_zip.uploaded") or die "Can't open $file_zip.uploaded for writing!\n" ;
          print FILE "MD5\t$md5\n";
          close FILE ;
+         
          if ($success) {
           print STDERR "Removing file $file_zip\n" ; 
           unlink $file_zip or warn "Could not unlink $file_zip: $!";
-          }
-          else{
-            print STDERR "Something wrong with ftp upload (success=$success). File size is " . ftp->size($file_zip) . "\n";
-          }
-        
-        else{
-          print STDERR "Leaving file $file_zip in staging dir.\n" if ($verbose) ;
-        }
+         }
+         else{
+            print STDERR "Something wrong with ftp upload (success=$success). File size is " . 
+            ftp->size($file_zip) . "\n";
+         }
        }
+       else{
+          print STDERR "Leaving file $file_zip in staging dir.\n" if ($verbose) ;
+       }
+      
 		   #print join "\n" , $ftp->ls ;
 		   #$ftp->cwd("/pub") or die "Cannot change working directory ", $ftp->message;
 		   #$ftp->get("that.file") or die "get failed ", $ftp->message;
