@@ -148,7 +148,7 @@ EOF
 }
 
 sub attributes2xml{
-  my ($self , $library) = @_ ;
+  my ($self , $library , $linkin_id ) = @_ ;
   my $xml = "<EXPERIMENT_ATTRIBUTES>" ;
   
   foreach my $key (keys %{$library->{data}}){
@@ -159,6 +159,12 @@ sub attributes2xml{
         <VALUE>$value</VALUE>
      </EXPERIMENT_ATTRIBUTE>
 EOF
+  }
+  if ($linkin_id) {
+    $xml .= $self->broker_object_id($linkin_id) ;
+  }
+  else{
+    print STDERR "No broker id in Experiment ($linkin_id)\n" ;
   }
   $xml .= "</EXPERIMENT_ATTRIBUTES>" ;
 
@@ -272,8 +278,8 @@ sub experiment2xml{
 EOF
 #$xml .= $self->spotDescriptor2xml();
  $xml .= $self->platform2xml($library)  ;
- $xml .= $self->attributes2xml($library);
- $xml .= $self->broker_object_id($linkin_id) ;
+ $xml .= $self->attributes2xml($library , $linkin_id);
+ #$xml .= $self->broker_object_id($linkin_id) ;
  $xml .= "</EXPERIMENT>" ; 
  
   return $xml
