@@ -829,7 +829,7 @@ sub prep_files_for_upload{
          }
          else{
             print STDERR "Something wrong with ftp upload (success=$success). File size is " . 
-            ftp->size($file_zip) . "\n";
+            $ftp->size($file_zip) . "\n";
          }
        }
        else{
