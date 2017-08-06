@@ -813,7 +813,7 @@ sub prep_files_for_upload{
 		 
 		   my $success = 0 ;
        $ftp->put($file_zip) unless ($skip_upload);
-       $success = 1 if $ftp->size($file_zip) ;
+       $success = 1 if $ftp->size($file_zip) unless ($skip_upload) ;
        
        print STDERR "FTP upload of $file_zip done.\n" if ($verbose) ;
        
@@ -828,8 +828,9 @@ sub prep_files_for_upload{
           unlink $file_zip or warn "Could not unlink $file_zip: $!";
          }
          else{
-            print STDERR "Something wrong with ftp upload (success=$success). File size is " . 
-            $ftp->size($file_zip) . "\n";
+            print STDERR "Something wrong with ftp upload (success=$success).\n";
+            print STDERR "File size is " . 
+            $ftp->size($file_zip) . "\n" unless ($skip_upload);
          }
        }
        else{
