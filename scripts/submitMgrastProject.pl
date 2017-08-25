@@ -289,8 +289,8 @@ open(FILE , ">$staging_dir/experiment.xml") or die "Can't write experiment.xml" 
 print FILE $experiment_xml ;
 close(FILE);
 
-
-
+print STDERR "Did write experiment file to $staging_dir/experiment.xml\n";
+exit;
 
 ###### Create RUN XML ######
 
@@ -303,6 +303,9 @@ EOF
 foreach my $metagenome_obj (@{$project_data->{metagenomes}}) {
 	#my $metagenome_id = $metagenome_obj->[0];
   my $metagenome_id = $metagenome_obj->{metagenome_id};
+  my $library_id    = $metagenome_obj->{library};
+  print Dumper $metagenome_obj ;
+  exit;
 	
   print STDERR "Prepping files for upload.\n" if ($verbose);
 	my ($file_name , $md5 , $err) = &prep_files_for_upload($ftp , $url , $stage_name , $metagenome_id) ; #if ($download_files);
@@ -313,7 +316,7 @@ foreach my $metagenome_obj (@{$project_data->{metagenomes}}) {
 
 	my ($run_data,$err2) = get_json_from_url($ua,$url,$run_resource,$metagenome_id,'');
 
-	$run_xml .= get_run_xml($run_data,$center_name,$metagenome_id , $file_name , $md5 , $project_id);
+	$run_xml .= get_run_xml($run_data,$center_name,$metagenome_id , $file_name , $md5 , $project_id , $library_id);
 }
 
 $run_xml .= "</RUN_SET>";
@@ -479,9 +482,11 @@ EOF
           <SAMPLE_ATTRIBUTE>
              <TAG>BROKER_OBJECT_ID</TAG>
              <VALUE>$id</VALUE>
+          </SAMPLE_ATTRIBUTE>   
+          <!-- SAMPLE_ATTRIBUTE>   
              <TAG>ENA-CHECKLIST</TAG>
              <VALUE>$checklistID</VALUE>
-          </SAMPLE_ATTRIBUTE>
+          </SAMPLE_ATTRIBUTE -->
 EOF
 }
 
@@ -586,7 +591,7 @@ EOF
 }
 
 sub get_run_xml {
-	my ($data,$center_name,$metagenome_id , $filename , $file_md5, $project_id) = @_;
+	my ($data,$center_name,$metagenome_id , $filename , $file_md5, $project_id , $experiment_id) = @_;
 	my $run_id = $data->{id};
 	my $run_name = $data->{name};
 	
@@ -813,8 +818,9 @@ sub prep_files_for_upload{
 		 
 		   my $success = 0 ;
        $ftp->put($file_zip) unless ($skip_upload);
-       $success = 1 if $ftp->size($file_zip) unless ($skip_upload) ;
-       
+       unless ($skip_upload) {
+         $success = 1 if $ftp->size($file_zip) 
+       };
        print STDERR "FTP upload of $file_zip done.\n" if ($verbose) ;
        
        if ($no_cache){
