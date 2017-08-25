@@ -161,6 +161,7 @@ sub attributes2xml{
 EOF
   }
   if ($linkin_id) {
+    print STDERR "Adding BROKER_OBJECT_ID\n" ;
     $xml .= $self->broker_object_id($linkin_id) ;
   }
   else{
@@ -177,7 +178,7 @@ sub broker_object_id{
   
   my $xml .= <<"EOF";
   <EXPERIMENT_ATTRIBUTE>
-      <TAG>BORKER_OBJECT_ID</TAG>
+      <TAG>BROKER_OBJECT_ID</TAG>
       <VALUE>$id</VALUE>
    </EXPERIMENT_ATTRIBUTE>
 EOF
@@ -226,7 +227,7 @@ sub experiment2xml{
   #my $experiment_id    = $data->{id};
   }
   
-  # BORKER_OBJECT_ID used to link experiment to MG-RAST
+  # BROKER_OBJECT_ID used to link experiment to MG-RAST
   my $linkin_id = $data->{id};
   
 	my $experiment_name   = $library->{name};
@@ -279,7 +280,7 @@ EOF
 #$xml .= $self->spotDescriptor2xml();
  $xml .= $self->platform2xml($library)  ;
  $xml .= $self->attributes2xml($library , $linkin_id);
- #$xml .= $self->broker_object_id($linkin_id) ;
+ #$xml .= $self->broker_object_id($linkin_id) ; 
  $xml .= "</EXPERIMENT>" ; 
  
   return $xml
